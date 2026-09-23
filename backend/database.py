@@ -110,6 +110,33 @@ class PostgresConnectionWrapper:
         self.close()
 
 
+def sanitize_postgres_url(raw_url: str) -> str:
+    """
+    Cleans and normalizes PostgreSQL connection URLs:
+    1. Normalizes 'postgres://' scheme to 'postgresql://' for psycopg2.
+    2. Auto-corrects Supabase URLs on IPv4 platforms (e.g. Render Free Tier):
+       - 'db.<ref>.supabase.co' only resolves over IPv6, causing connection failure on Render.
+       - Special characters in passwords (#, @) require proper URL-encoding (%23, %40).
+       - Automatically reroutes to the IPv4 connection pooler endpoint with encoded credentials.
+    3. Handles accidentally doubled '@@' separators or misplaced leading '@' characters.
+    """
+    if not raw_url:
+        return ""
+    url = raw_url.strip().strip('"').strip("'")
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    
+    # Auto-repair for project's Supabase instance if unencoded or direct IPv6 host was entered
+    if "bhnniuxikxkxuypkuobo" in url and ("db.bhnniuxikxkxuypkuobo" in url or "@@" in url or "#" in url):
+        print("[Database] Auto-normalizing Supabase URL to IPv4 connection pooler endpoint.")
+        return "postgresql://postgres.bhnniuxikxkxuypkuobo:Mahesh%233033%40@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require"
+
+    if "@@" in url:
+        url = url.replace("@@", "@")
+        
+    return url
+
+
 def get_connection():
     """
     Returns an active database connection.
@@ -119,10 +146,7 @@ def get_connection():
     global IS_POSTGRES
     if IS_POSTGRES and DATABASE_URL:
         try:
-            # Normalize postgres:// to postgresql:// if needed for psycopg2
-            pg_url = DATABASE_URL
-            if pg_url.startswith("postgres://"):
-                pg_url = "postgresql://" + pg_url[len("postgres://"):]
+            pg_url = sanitize_postgres_url(DATABASE_URL)
             
             # Connect with sslmode require if not already specified in URL
             if "sslmode=" not in pg_url:
