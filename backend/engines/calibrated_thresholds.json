@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "trained_on": "ASVspoof 2017/2015 + ElevenLabs + Google Voice + Real Human",
+    "num_human_chunks": 221,
+    "num_ai_chunks": 706,
+    "method": "Empirical Percentile Boundary Calibration"
+  },
+  "thresholds": {
+    "jitter_min": 0.85,
+    "jitter_max": 3.1,
+    "glottal_kurt_min": 11.0,
+    "voiced_hi_ratio_max": 0.38,
+    "stft_hi_ratio_max": 0.24,
+    "low_freq_ratio_min": 0.1508,
+    "pause_std_min": 0.018,
+    "pause_cv_min": 0.22
+  }
+}

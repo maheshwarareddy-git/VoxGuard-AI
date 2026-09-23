@@ -1,0 +1,105 @@
+# ========================================================
+# VoxGuard Enterprise - Comprehensive Zero-Leak .gitignore
+# ========================================================
+
+# --- Environment & Secret Protection ---
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Database Files (NEVER COMMIT SENSITIVE OPERATIONAL DATA) ---
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+voxguard.db
+backend/voxguard.db
+
+# --- Windows Embedded Runtime & Virtual Environments ---
+python-runtime/
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Audio Datasets, Samples & Parquets (Multi-Gigabyte Training Data) ---
+training_data/
+test_samples/
+*.parquet
+*.wav
+*.flac
+*.mp3
+*.ogg
+*.m4a
+*.aac
+*.tar.gz
+*.tar
+*.zip
+*.7z
+
+# --- Scratchpad, Temporary Logs & Debug Runs ---
+scratch/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Python Compiled & Cache Files ---
+__pycache__/
+*/__pycache__/
+*/**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Node / Next.js Build Artifacts ---
+node_modules/
+*/node_modules/
+*/**/node_modules/
+.next/
+*/.next/
+*/**/.next/
+out/
+build/
+dist/
+.pnp
+.pnp.*
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Security Certificates & Private Keys ---
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# --- IDE & OS Specific Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
