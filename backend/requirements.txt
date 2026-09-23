@@ -5,7 +5,7 @@ python-multipart>=0.0.9
 numpy>=1.26.0
 scipy>=1.14.0
 websockets>=13.0
-scikit-learn>=1.5.0
+scikit-learn==1.9.0
 joblib>=1.4.0
 soundfile>=0.12.0
 av>=12.0.0
