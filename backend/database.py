@@ -368,6 +368,24 @@ def init_db(reset: bool = False):
                 "Lead SOC Analyst"
             ))
 
+        # Ensure Evaluator account exists
+        cursor.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(%s) OR LOWER(username) = LOWER(%s)", ("Evaluator@security.ac.in", "evaluator"))
+        if not cursor.fetchone():
+            eval_pw_hash, eval_salt = hash_password("123456")
+            cursor.execute("""
+            INSERT INTO users (id, username, email, password_hash, salt, full_name, role)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+            """, (
+                "usr_default_evaluator",
+                "evaluator",
+                "Evaluator@security.ac.in",
+                eval_pw_hash,
+                eval_salt,
+                "Security Evaluator",
+                "Lead SOC Analyst"
+            ))
+
         conn.commit()
         conn.close()
         return
@@ -556,6 +574,23 @@ def init_db(reset: bool = False):
             pw_hash,
             salt,
             "Security Operator",
+            "Lead SOC Analyst"
+        ))
+
+    # Ensure default evaluator account exists
+    cursor.execute("SELECT id FROM users WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)", ("Evaluator@security.ac.in", "evaluator"))
+    if not cursor.fetchone():
+        eval_pw_hash, eval_salt = hash_password("123456")
+        cursor.execute("""
+        INSERT INTO users (id, username, email, password_hash, salt, full_name, role)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "usr_default_evaluator",
+            "evaluator",
+            "Evaluator@security.ac.in",
+            eval_pw_hash,
+            eval_salt,
+            "Security Evaluator",
             "Lead SOC Analyst"
         ))
 

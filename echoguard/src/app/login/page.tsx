@@ -13,6 +13,10 @@ import {
   AlertCircle,
   ArrowRight,
   Fingerprint,
+  Key,
+  Copy,
+  Check,
+  Sparkles,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -22,6 +26,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Evaluator credential quick-actions
+  const [copiedField, setCopiedField] = useState<"email" | "pass" | null>(null);
+  const [filled, setFilled] = useState(false);
 
   // Login form state
   const [loginUsername, setLoginUsername] = useState("");
@@ -33,6 +41,21 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regRole, setRegRole] = useState("Lead SOC Analyst");
+
+  const handleQuickFill = () => {
+    setLoginUsername("Evaluator@security.ac.in");
+    setLoginPassword("123456");
+    setFilled(true);
+    setTimeout(() => setFilled(false), 2000);
+  };
+
+  const handleCopy = (text: string, field: "email" | "pass") => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1800);
+    }
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +76,7 @@ export default function LoginPage() {
       if (err instanceof Error) {
         setErrorMsg(err.message);
       } else {
-        setErrorMsg("Failed to authenticate with local database.");
+        setErrorMsg("Failed to authenticate with database.");
       }
     } finally {
       setSubmitting(false);
@@ -187,71 +210,145 @@ export default function LoginPage() {
 
             {/* SIGN IN FORM */}
             {mode === "login" && (
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                    Analyst Identifier <span className="text-gray-500 font-mono">(Username or Email)</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-                      <User className="w-4 h-4" />
+              <div className="space-y-4">
+                {/* Evaluator Demo Credentials Card */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-orange-950/40 via-gray-900/90 to-gray-900/60 border border-orange-500/30 text-xs shadow-lg relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="p-1 rounded-md bg-orange-500/10 border border-orange-500/30 text-[#F6821F]">
+                        <Key className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="font-semibold text-gray-200 text-xs">Evaluator Access Credentials</span>
                     </div>
-                    <input
-                      type="text"
-                      value={loginUsername}
-                      onChange={(e) => setLoginUsername(e.target.value)}
-                      placeholder="operator or email@voxguard.security"
-                      required
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-900/80 border border-gray-800 rounded-xl text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-[#F6821F] focus:ring-1 focus:ring-[#F6821F] transition-all"
-                    />
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-orange-500/15 text-[#F6821F] border border-orange-500/30 font-semibold">
+                      Demo Account
+                    </span>
                   </div>
+
+                  <div className="space-y-1.5 font-mono text-[11px] bg-black/50 p-2.5 rounded-lg border border-gray-800/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">mail :</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-white font-medium select-all">Evaluator@security.ac.in</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy("Evaluator@security.ac.in", "email")}
+                          className="p-1 hover:text-white text-gray-400 rounded transition-colors"
+                          title="Copy Email"
+                        >
+                          {copiedField === "email" ? (
+                            <Check className="w-3.5 h-3.5 text-green-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-800/80">
+                      <span className="text-gray-400">pass :</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[#F6821F] font-medium select-all">123456</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy("123456", "pass")}
+                          className="p-1 hover:text-white text-gray-400 rounded transition-colors"
+                          title="Copy Password"
+                        >
+                          {copiedField === "pass" ? (
+                            <Check className="w-3.5 h-3.5 text-green-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleQuickFill}
+                    className="w-full mt-2.5 py-1.5 px-3 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-[#F6821F] hover:text-orange-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {filled ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-green-400" />
+                        <span className="text-green-400 font-semibold">Credentials Populated!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Click to Auto-Fill Credentials</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-medium text-gray-300">Security Password</label>
-                    <span className="text-[11px] text-gray-500 font-mono">PBKDF2 SHA-256</span>
-                  </div>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-                      <Lock className="w-4 h-4" />
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                      Analyst Identifier <span className="text-gray-500 font-mono">(Username or Email)</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={loginUsername}
+                        onChange={(e) => setLoginUsername(e.target.value)}
+                        placeholder="Evaluator@security.ac.in"
+                        required
+                        className="w-full pl-9 pr-3 py-2.5 bg-gray-900/80 border border-gray-800 rounded-xl text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-[#F6821F] focus:ring-1 focus:ring-[#F6821F] transition-all"
+                      />
                     </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      required
-                      className="w-full pl-9 pr-10 py-2.5 bg-gray-900/80 border border-gray-800 rounded-xl text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-[#F6821F] focus:ring-1 focus:ring-[#F6821F] transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-[#F6821F] to-[#E85D04] text-white font-medium text-sm flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.99] disabled:opacity-50 transition-all shadow-lg shadow-orange-500/25 cursor-pointer"
-                >
-                  {submitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Authenticating Locally...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Authorize SOC Session</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-medium text-gray-300">Security Password</label>
+                      <span className="text-[11px] text-gray-500 font-mono">PBKDF2 SHA-256</span>
+                    </div>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        required
+                        className="w-full pl-9 pr-10 py-2.5 bg-gray-900/80 border border-gray-800 rounded-xl text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-[#F6821F] focus:ring-1 focus:ring-[#F6821F] transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-[#F6821F] to-[#E85D04] text-white font-medium text-sm flex items-center justify-center gap-2 hover:opacity-95 active:scale-[0.99] disabled:opacity-50 transition-all shadow-lg shadow-orange-500/25 cursor-pointer"
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Authenticating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Authorize SOC Session</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
             )}
 
             {/* REGISTER FORM */}
@@ -351,7 +448,7 @@ export default function LoginPage() {
                   {submitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Writing to Local Database...</span>
+                      <span>Registering Analyst Session...</span>
                     </>
                   ) : (
                     <>
