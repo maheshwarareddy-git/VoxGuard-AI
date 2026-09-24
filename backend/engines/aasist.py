@@ -539,7 +539,7 @@ class AASISTAuthenticityEngine:
         synthetic_indicators: List[str] = []
         threat_penalty = 0.0
 
-        # Compute ML inference from trained ASVspoof + ElevenLabs/Google Voice model
+        # Compute ML inference from trained multi-platform model
         ml_prob = 0.50
         if self.trained_classifier is not None and self.trained_features:
             try:
@@ -555,94 +555,82 @@ class AASISTAuthenticityEngine:
             except Exception:
                 ml_prob = 0.50
 
-        # Defect 1: Robotic Pitch Rigidity (Classic TTS flat monotonic tone)
-        if len(voiced_f0) >= 4 and pitch_range < 10.0 and pitch_cv < 2.0 and jitter < 0.22:
+        # ── DEFECT 1: Robotic Pitch Monotone / Rigid TTS Contours ──
+        # Real human speech naturally inflects pitch across vowels (> 10Hz range).
+        # AI TTS voices produce flat, unnatural monotonic lines.
+        is_robotic_pitch = (len(voiced_f0) >= 4 and pitch_range < 7.0 and pitch_cv < 1.8 and jitter < 0.22)
+        if is_robotic_pitch:
             threat_penalty += 45.0
-            synthetic_indicators.append(f"Robotic Pitch Rigidity (Range: {pitch_range:.1f}Hz, Jitter: {jitter:.3f}%)")
+            synthetic_indicators.append(f"Robotic Pitch Rigidity (Pitch Range: {pitch_range:.1f}Hz < 7Hz, Jitter: {jitter:.3f}%)")
 
-        # Defect 2: Neural Vocoder High-Frequency Aliasing
-        if voiced_hi_ratio > 0.36 and (ml_prob >= 0.40 or (env_diff_kurt < 8.0 and jitter > 2.6)):
-            aliasing_pts = min(45.0, 32.0 + (voiced_hi_ratio - 0.36) * 55.0)
+        # ── DEFECT 2: Neural Vocoder High-Frequency Aliasing ──
+        # Transposed 1D convolutions in neural vocoders (MelGAN, HiFi-GAN) create mirror harmonics above 6.5kHz
+        if voiced_hi_ratio > 0.48:
+            aliasing_pts = min(50.0, 35.0 + (voiced_hi_ratio - 0.48) * 60.0)
             threat_penalty += aliasing_pts
-            synthetic_indicators.append(f"Neural Vocoder Aliasing (Voiced HF/Mid: {voiced_hi_ratio:.3f} > 0.360)")
+            synthetic_indicators.append(f"Neural Vocoder Aliasing (Voiced HF/Mid: {voiced_hi_ratio:.3f} > 0.480)")
 
-        # Defect 3: Vocoder Phase Discontinuity & Elevated Jitter (ElevenLabs / Neural Vocoders)
-        if jitter > 2.85 and env_diff_kurt < 12.0 and (ml_prob >= 0.40 or voiced_hi_ratio > 0.32):
-            threat_penalty += 36.0
-            synthetic_indicators.append(f"Vocoder Phase Discontinuity (Jitter: {jitter:.2f}% > 2.85%, Soft Kurtosis: {env_diff_kurt:.1f})")
+        # ── DEFECT 3: Vocoder Phase Discontinuity & Synthetic Jitter Zone ──
+        if (jitter > 3.6 or jitter < 0.15) and env_diff_kurt < 6.0:
+            threat_penalty += 40.0
+            synthetic_indicators.append(f"Vocoder Phase Discontinuity (Jitter: {jitter:.2f}%, Low Kurtosis: {env_diff_kurt:.1f})")
 
-        # Defect 4: Vocoder Spectral Leakage (Mirror harmonics with weak glottal envelope)
-        if (voiced_hi_ratio > 0.34 and env_diff_kurt < 7.0 and ml_prob >= 0.38) or \
-           (stft_hi_ratio > 0.220 and env_diff_kurt < 6.5 and ml_prob >= 0.38):
-            threat_penalty += 36.0
-            synthetic_indicators.append(f"Vocoder Spectral Leakage (STFT HF: {stft_hi_ratio:.3f}, Soft Kurtosis: {env_diff_kurt:.1f})")
+        # ── DEFECT 4: External Loudspeaker / Phone Playback Signature ──
+        # Smartphone & external device speakers cannot physically reproduce sub-220Hz bass (< 0.028)
+        # and create acoustic resonance peaks in the 1.5kHz-3.5kHz band.
+        is_loudspeaker_replay = (
+            low_freq_ratio < 0.028 and 
+            (is_robotic_pitch or voiced_hi_ratio > 0.42 or env_diff_kurt < 4.0 or ml_prob >= 0.60)
+        )
+        if is_loudspeaker_replay:
+            threat_penalty += 45.0
+            synthetic_indicators.append(f"Loudspeaker / External Device Replay (Sub-220Hz Bass Cutoff: {low_freq_ratio:.4f} < 0.028)")
 
-        # Defect 5: Isochronous Word Pacing (Metronomic AI cadence)
-        if len(pauses) >= 3 and pause_std < 0.018 and pause_cv < 0.22 and (ml_prob >= 0.42 or threat_penalty > 0):
-            threat_penalty += 35.0
-            synthetic_indicators.append(f"Isochronous Word Pacing (Gap Variance: {pause_std*1000:.1f}ms)")
-
-        # Defect 6: Mobile / External Loudspeaker Replay Signature
-        # Phone / external speakers attenuate sub-220Hz bass (< 0.055) and have weak chest resonance
-        if low_freq_ratio < 0.055 and (threat_penalty > 0 or ml_prob >= 0.38):
-            threat_penalty += 36.0
-            synthetic_indicators.append(f"Loudspeaker / Acoustic Replay (Sub-220Hz: {low_freq_ratio:.4f} < 0.055)")
-
-        # Defect 7: Multi-Platform AI Model (OpenAI, Gemini, Claude, ElevenLabs, ASVspoof, WaveFake - 139k chunks)
-        if ml_prob >= 0.45:
-            ml_pts = min(60.0, 38.0 + (ml_prob - 0.45) * 60.0)
+        # ── DEFECT 5: Trained Multi-Platform AI Model (Calibrated Confidence) ──
+        # High confidence detection (OpenAI, ElevenLabs, Gemini, Azure TTS, WaveFake)
+        if ml_prob >= 0.70:
+            ml_pts = min(60.0, 40.0 + (ml_prob - 0.70) * 65.0)
             threat_penalty += ml_pts
-            synthetic_indicators.append(f"Trained Multi-Platform AI Model ({ml_prob*100:.1f}% Confidence)")
-        elif ml_prob >= 0.35:
-            threat_penalty += 22.0
-            if threat_penalty >= 35.0:
-                synthetic_indicators.append(f"Borderline AI Spectral Signature ({ml_prob*100:.1f}%)")
+            synthetic_indicators.append(f"Multi-Platform AI Voice Signature ({ml_prob*100:.1f}% Confidence)")
+        elif ml_prob >= 0.58 and (is_robotic_pitch or voiced_hi_ratio > 0.40 or is_loudspeaker_replay):
+            threat_penalty += 35.0
+            synthetic_indicators.append(f"AI Spectral Resonance ({ml_prob*100:.1f}% Confidence)")
 
         # ── 5. BONA FIDE HUMAN VOICE CONFIRMATION ──
-        # A true human speaker naturally possesses physiological vocal fold micro-tremors,
-        # natural glottal impulse transients, organic pitch movement, natural formant decay,
-        # and full vocal chest resonance (> 0.075 low frequency ratio).
-        has_human_jitter = (0.25 <= jitter <= 3.8)
-        has_natural_kurtosis = (env_diff_kurt >= 5.5)
-        has_pitch_movement = (pitch_range >= 8.0 or pitch_cv >= 2.0)
-        has_sufficient_voicing = (len(voiced_f0) >= 3)
+        # A live human speaking into the microphone possesses biological vocal tract physics:
+        # 1. Natural pitch inflection and prosody (pitch_range >= 10Hz or pitch_cv >= 2.0%)
+        # 2. Biological vocal fold micro-tremor (0.3% <= jitter <= 3.4%)
+        # 3. Natural glottal derivative impulse (env_diff_kurt >= 4.0)
+        # 4. Formants without harsh vocoder aliasing (voiced_hi_ratio < 0.45)
+        has_human_jitter = (0.30 <= jitter <= 3.40)
+        has_natural_glottal_pulse = (env_diff_kurt >= 4.0)
+        has_pitch_inflection = (pitch_range >= 10.0 or pitch_cv >= 2.0 or len(voiced_f0) < 4)
+        has_natural_spectral_decay = (voiced_hi_ratio < 0.45 and stft_hi_ratio < 0.35)
 
-        is_direct_human = (
+        is_bona_fide_human = (
             has_human_jitter and
-            has_natural_kurtosis and
-            has_pitch_movement and
-            has_sufficient_voicing and
-            ml_prob < 0.30 and
-            low_freq_ratio >= 0.075 and
-            voiced_hi_ratio < 0.25 and
-            stft_hi_ratio < 0.18
+            has_natural_glottal_pulse and
+            has_pitch_inflection and
+            has_natural_spectral_decay and
+            not is_robotic_pitch and
+            not is_loudspeaker_replay
         )
 
-        is_bona_fide_human = is_direct_human or (
-            has_human_jitter and
-            has_natural_kurtosis and
-            has_pitch_movement and
-            has_sufficient_voicing and
-            ml_prob < 0.25 and
-            low_freq_ratio >= 0.065 and
-            (voiced_hi_ratio < 0.32 or env_diff_kurt >= 14.0)
-        )
-
-        # If human biophysical signatures are verified, clear any uncorroborated false threats
+        # Clear any uncorroborated penalties for confirmed human voice
         if is_bona_fide_human:
             threat_penalty = 0.0
             synthetic_indicators = []
 
         # ─── DECISION ───
         if threat_penalty >= 35.0:
-            authenticity_score = round(float(np.clip(42.0 - threat_penalty * 0.30, 12.0, 38.0)), 1)
+            authenticity_score = round(float(np.clip(38.0 - threat_penalty * 0.25, 12.0, 35.0)), 1)
             is_synthetic = True
-            reasons = "; ".join(synthetic_indicators[:2]) if synthetic_indicators else "Neural Vocoder Artifacts"
+            reasons = "; ".join(synthetic_indicators[:2]) if synthetic_indicators else "Synthetic Vocoder Artifacts"
             status = f"SYNTHETIC SPEECH DETECTED ({authenticity_score:.1f}%): {reasons}"
         else:
-            authenticity_score = round(float(np.clip(94.0 - threat_penalty * 0.10, 88.0, 97.5)), 1)
+            authenticity_score = round(float(np.clip(96.0 - threat_penalty * 0.10, 90.0, 98.0)), 1)
             is_synthetic = False
-            status = f"Bona Fide Human Voice ({authenticity_score:.1f}%): Verified Formants & Dynamic Pitch Inflection"
+            status = f"Bona Fide Human Voice ({authenticity_score:.1f}%): Verified Dynamic Pitch & Biological Formants"
 
         return {
             "authenticity": authenticity_score,
