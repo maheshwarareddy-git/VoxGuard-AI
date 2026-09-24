@@ -7,6 +7,14 @@ import secrets
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
+try:
+    import psycopg2
+    import psycopg2.extras
+    PSYCOPG2_AVAILABLE = True
+except ImportError:
+    psycopg2 = None
+    PSYCOPG2_AVAILABLE = False
+
 # Load environment variables from backend/.env or root .env
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
@@ -16,15 +24,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 # SQLite fallback path
 DB_PATH = os.path.join(os.path.dirname(__file__), "voxguard.db")
 
-IS_POSTGRES = bool(DATABASE_URL and (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")))
+def is_postgres_configured() -> bool:
+    url = os.environ.get("DATABASE_URL", DATABASE_URL).strip()
+    return bool(PSYCOPG2_AVAILABLE and url and (url.startswith("postgresql://") or url.startswith("postgres://")))
 
-if IS_POSTGRES:
-    try:
-        import psycopg2
-        import psycopg2.extras
-    except ImportError:
-        IS_POSTGRES = False
-        print("Warning: psycopg2 not found. Falling back to local SQLite.")
+IS_POSTGRES = is_postgres_configured()
 
 class PostgresCursorWrapper:
     def __init__(self, raw_cursor):
@@ -48,6 +52,8 @@ class PostgresCursorWrapper:
         if params is not None:
             if isinstance(params, list):
                 params = tuple(params)
+            elif not isinstance(params, (tuple, dict)):
+                params = (params,)
             return self.cursor.execute(sql, params)
         return self.cursor.execute(sql)
 
@@ -73,7 +79,10 @@ class PostgresCursorWrapper:
         return self.cursor.description
 
     def close(self):
-        self.cursor.close()
+        try:
+            self.cursor.close()
+        except Exception:
+            pass
 
     def __enter__(self):
         return self
@@ -94,10 +103,16 @@ class PostgresConnectionWrapper:
         self.conn.commit()
 
     def rollback(self):
-        self.conn.rollback()
+        try:
+            self.conn.rollback()
+        except Exception:
+            pass
 
     def close(self):
-        self.conn.close()
+        try:
+            self.conn.close()
+        except Exception:
+            pass
 
     def __enter__(self):
         return self
@@ -115,7 +130,7 @@ def sanitize_postgres_url(raw_url: str) -> str:
     Cleans and normalizes PostgreSQL connection URLs:
     1. Normalizes 'postgres://' scheme to 'postgresql://' for psycopg2.
     2. Auto-corrects Supabase URLs on IPv4 platforms (e.g. Render Free Tier):
-       - 'db.<ref>.supabase.co' only resolves over IPv6, causing connection failure on Render.
+       - 'db.<ref>.supabase.co' only resolves over IPv6, causing connection failure on IPv4 networks.
        - Special characters in passwords (#, @) require proper URL-encoding (%23, %40).
        - Automatically reroutes to the IPv4 connection pooler endpoint with encoded credentials.
     3. Handles accidentally doubled '@@' separators or misplaced leading '@' characters.
@@ -127,7 +142,7 @@ def sanitize_postgres_url(raw_url: str) -> str:
         url = "postgresql://" + url[len("postgres://"):]
     
     # Auto-repair for project's Supabase instance if unencoded or direct IPv6 host was entered
-    if "bhnniuxikxkxuypkuobo" in url and ("db.bhnniuxikxkxuypkuobo" in url or "@@" in url or "#" in url):
+    if "bhnniuxikxkxuypkuobo" in url and ("db.bhnniuxikxkxuypkuobo" in url or "@@" in url or "#" in url or "@" in url.split(":")[2].split("@")[0] if len(url.split(":")) > 2 and "@" in url.split(":")[2] else False):
         print("[Database] Auto-normalizing Supabase URL to IPv4 connection pooler endpoint.")
         return "postgresql://postgres.bhnniuxikxkxuypkuobo:Mahesh%233033%40@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require"
 
@@ -140,13 +155,13 @@ def sanitize_postgres_url(raw_url: str) -> str:
 def get_connection():
     """
     Returns an active database connection.
-    If DATABASE_URL is configured (e.g. Neon, Supabase, Render Postgres), returns a Cloud PostgreSQL connection.
+    If DATABASE_URL is configured (e.g. Supabase, Neon, Render Postgres), returns a Cloud PostgreSQL connection.
     Otherwise, returns a local SQLite connection (voxguard.db).
     """
-    global IS_POSTGRES
-    if IS_POSTGRES and DATABASE_URL:
+    db_url = os.environ.get("DATABASE_URL", DATABASE_URL).strip()
+    if PSYCOPG2_AVAILABLE and db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
         try:
-            pg_url = sanitize_postgres_url(DATABASE_URL)
+            pg_url = sanitize_postgres_url(db_url)
             
             # Connect with sslmode require if not already specified in URL
             if "sslmode=" not in pg_url:
@@ -156,7 +171,7 @@ def get_connection():
             
             return PostgresConnectionWrapper(conn)
         except Exception as e:
-            print(f"PostgreSQL connection error: {e}. Falling back to local SQLite.")
+            print(f"[Database] PostgreSQL connection error: {e}. Falling back to local SQLite.")
     
     # SQLite fallback
     conn = sqlite3.connect(DB_PATH)

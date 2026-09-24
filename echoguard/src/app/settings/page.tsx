@@ -1010,7 +1010,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <span className="font-semibold text-gray-500 block">Database Storage</span>
-                    <span className="font-bold text-gray-900 text-sm">SQLite (voxguard.db)</span>
+                    <span className="font-bold text-gray-900 text-sm">Cloud PostgreSQL (Supabase) / SQLite</span>
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <span className="font-semibold text-gray-500 block">Authenticity Engine</span>

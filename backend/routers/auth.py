@@ -167,17 +167,26 @@ def get_current_user(token: str = Depends(extract_token_from_header)):
         raise HTTPException(status_code=401, detail="Invalid or expired session token")
 
     # Check expiration
-    expires_str = row["expires_at"]
+    expires_val = row["expires_at"]
     try:
-        # Support both ISO format with Z and without
-        exp_clean = expires_str.replace("Z", "")
-        expires_dt = datetime.fromisoformat(exp_clean)
-        if datetime.utcnow() > expires_dt:
+        if isinstance(expires_val, datetime):
+            expires_dt = expires_val
+        else:
+            expires_str = str(expires_val).replace("Z", "")
+            expires_dt = datetime.fromisoformat(expires_str)
+        
+        # Compare as naive UTC or timezone-aware
+        now_dt = datetime.utcnow()
+        if expires_dt.tzinfo is not None:
+            expires_dt = expires_dt.replace(tzinfo=None)
+        if now_dt > expires_dt:
             cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
             conn.commit()
             conn.close()
             raise HTTPException(status_code=401, detail="Session has expired. Please log in again.")
-    except ValueError:
+    except HTTPException:
+        raise
+    except Exception:
         pass
 
     conn.close()
